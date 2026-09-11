@@ -4,10 +4,6 @@
 //! `SPEC.md` §2, §3, §6, §7. Every subcommand goes through here so that none of
 //! them invents its own idea of what a BED record is.
 
-// Parts of this layer are used only by subcommands that are still stubs.
-// TODO: drop this once sort, merge and intersect are all implemented.
-#![allow(dead_code)]
-
 use std::fmt;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
@@ -52,20 +48,10 @@ impl Record {
         self.line.split('\t').count()
     }
 
-    /// Column 4 (`name`), BED4 and wider.
-    pub fn name(&self) -> Option<&str> {
-        self.field(3)
-    }
-
     /// Column 6 (`strand`), BED6 and wider. `None` on narrower input — callers
     /// that need a strand warn rather than fail (`SPEC.md` §3, §7).
     pub fn strand(&self) -> Option<&str> {
         self.field(5)
-    }
-
-    /// Does this record overlap `other`? Same chromosome and [`overlaps`].
-    pub fn overlaps(&self, other: &Record) -> bool {
-        self.chrom == other.chrom && overlaps(self.start, self.end, other.start, other.end)
     }
 }
 
@@ -373,32 +359,12 @@ mod tests {
     }
 
     #[test]
-    fn record_overlap_requires_same_chromosome() {
-        let a = Record {
-            chrom: "chr1".into(),
-            start: 0,
-            end: 100,
-            line: "chr1\t0\t100".into(),
-        };
-        let b = Record {
-            chrom: "chr2".into(),
-            start: 0,
-            end: 100,
-            line: "chr2\t0\t100".into(),
-        };
-        assert!(!a.overlaps(&b));
-        assert!(a.overlaps(&a.clone()));
-    }
-
-    // --- parsing ---
-
-    #[test]
     fn parses_bed3_through_bed6_and_keeps_original_width() {
         let recs =
             parse_all("chr1\t0\t100\nchr1\t100\t200\tn\nchr1\t200\t300\tn\t5\t+\textra\n").unwrap();
         assert_eq!(recs.len(), 3);
         assert_eq!(recs[0].ncols(), 3);
-        assert_eq!(recs[1].name(), Some("n"));
+        assert_eq!(recs[1].field(3), Some("n"));
         assert_eq!(recs[2].ncols(), 7);
         assert_eq!(recs[2].strand(), Some("+"));
         // Verbatim echo: the line is carried, not rebuilt.

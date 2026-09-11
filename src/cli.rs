@@ -3,9 +3,6 @@
 //! `SPEC.md` §4, §7. Flag names and meanings match bedtools exactly. Anything
 //! not listed here is a usage error — never silently ignored.
 
-// TODO: drop this once sort, merge and intersect are all implemented.
-#![allow(dead_code)]
-
 use std::fmt;
 
 pub const USAGE: &str = "\
