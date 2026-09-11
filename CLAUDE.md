@@ -71,7 +71,10 @@ fails, look there first.
 - Read from a file argument or stdin (`-` means stdin).
 - Errors go to stderr, never stdout — stdout is data and gets piped.
 - Exit codes: `0` success, `1` bad input data, `2` usage error.
-- No third-party runtime dependencies. Standard library only.
+- No third-party runtime dependencies. Standard library only, with one exception:
+  `flate2` for gzip/bgzip input. Real bedtools reads `.gz` natively, so oracle
+  parity requires it and Rust's std has no gzip decoder. Any *further* dependency
+  needs asking first.
 
 ## Commits and PRs
 
