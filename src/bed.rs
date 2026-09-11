@@ -279,8 +279,19 @@ mod tests {
     use std::io::Write;
 
     fn tmpfile(name: &str, body: &[u8]) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        // Tests run in parallel and several of them ask for the same `name`, so
+        // the path needs a per-call counter as well as the pid — otherwise two
+        // tests race on one file and whichever loses sees "no such file".
+        static SEQ: AtomicU64 = AtomicU64::new(0);
+        let seq = SEQ.fetch_add(1, Ordering::Relaxed);
         let mut p = std::env::temp_dir();
-        p.push(format!("mytools-bed-test-{}-{}", std::process::id(), name));
+        p.push(format!(
+            "mytools-bed-test-{}-{}-{}",
+            std::process::id(),
+            seq,
+            name
+        ));
         let mut f = File::create(&p).unwrap();
         f.write_all(body).unwrap();
         p
