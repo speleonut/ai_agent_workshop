@@ -168,6 +168,15 @@ impl Reader {
         &self.name
     }
 
+    /// The line number of the record last returned, 1-based, counting header
+    /// and blank lines — so it matches `sed -n '<n>p'` on the source. Callers
+    /// reporting an error about a record they have already taken (`merge`'s
+    /// unsorted-input check) need this; errors raised by the reader itself
+    /// carry it already.
+    pub fn lineno(&self) -> u64 {
+        self.lineno
+    }
+
     /// `#`, `track` and `browser` lines seen so far, in input order, with
     /// terminators stripped. They never reach the interval logic; `-header`
     /// replays them ahead of the results (`SPEC.md` §5).
@@ -541,6 +550,21 @@ mod tests {
             Error::at("data/a.bed", 7, "start greater than end").to_string(),
             "mytools: data/a.bed:7: start greater than end"
         );
+    }
+
+    #[test]
+    fn lineno_tracks_the_record_just_returned() {
+        // merge reports "input is not sorted" against a record it has already
+        // taken, so the counter has to be readable from outside and has to
+        // count the lines the reader skips.
+        let p = tmpfile("lineno", b"#h\n\nchr1\t0\t100\nchr1\t200\t300\n");
+        let mut r = Reader::open(p.to_str().unwrap()).unwrap();
+        assert_eq!(r.lineno(), 0);
+        r.next().unwrap().unwrap();
+        assert_eq!(r.lineno(), 3);
+        r.next().unwrap().unwrap();
+        assert_eq!(r.lineno(), 4);
+        std::fs::remove_file(&p).ok();
     }
 
     #[test]

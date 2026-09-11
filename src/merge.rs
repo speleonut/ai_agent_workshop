@@ -242,10 +242,9 @@ fn merge_into<W: Write>(
             sink.set_headers(reader.headers().to_vec());
         }
 
-        // The reader does not expose its line counter, so reconstruct it:
-        // header lines seen so far plus data records read. Exact unless the
-        // file contains blank lines, which the reader also skips silently.
-        let lineno = reader.headers().len() as u64 + records;
+        // The true file line of the record just taken, blank and header lines
+        // included, so the message points where `sed -n '<n>p'` would.
+        let lineno = reader.lineno();
         let unsorted = || bed::Error::at(&name, lineno, "input is not sorted");
 
         match &prev {
