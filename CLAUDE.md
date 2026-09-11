@@ -1,111 +1,84 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Conventions for the `mytools` project. This **overwrites** the `CLAUDE.md` in the repo
+root during setup — the one there is notes for the upstream template, not for your
+project. It is read automatically at the start of every session, so edit it as your
+design firms up, either directly or with the `#` prefix from inside a session.
 
-## What this repo is
+## My fork — fill this in first
 
-`SACGF/ai_agent_workshop` is the **GitHub template repository** for a 3.5-hour hands-on
-workshop, "Agentic Coding for Bioinformaticians" (Claude Code, taught to professional
-bioinformaticians and PhD students who are mostly new to it). Attendees fork this repo
-and work in their fork on Ubuntu 24 VMs that already have `gh`, Python, R, `bedtools`
-set up. Each attendee signs in to Claude Code with one of 24 workshop
-subscription accounts (`/login`); there are no API keys on the VMs.
+**My fork is `speleonut/ai_agent_workshop`.**
 
-The repo is **scaffolding, not software**. As of the initial commit it contains only
-`README.md` (a stub), `LICENSE`, `.gitignore` and `workshop-repo-notes.md`.
+Anything that **creates** — `gh issue create`, `gh pr create` — passes
+`--repo speleonut/ai_agent_workshop`. Never write to
+`SACGF/ai_agent_workshop`: that's the shared upstream template and thirty other people
+are working from it.
 
-## Read this first
+Reading and reviewing someone else's PR is fine when I name their fork explicitly
+(`gh pr diff`, `gh pr review --repo <partner>/ai_agent_workshop`). The rule is about
+where new things land, not about what you're allowed to look at.
 
-`workshop-repo-notes.md` is the design brief for the whole repo: target structure,
-file-by-file requirements, the timed agenda, fixture edge cases, and the pre-filed
-issues. **Read it before creating or changing any workshop content** — most requests in
-this repo are "build the next piece of that brief", and it is the source of truth for
-what each file must contain.
+Pass the flag every time. `gh` with a missing or empty `--repo` does not fail — it
+silently resolves to the git remote and exits 0, so a forgotten flag looks exactly like
+a success.
 
-## Hard constraints
+## What this is
 
-- **Never implement mytools.** The anchor exercise is attendees reimplementing a subset
-  of bedtools (`sort`, `merge`, `intersect`, `subtract`, `closest`) as a CLI called
-  `mytools`. This repo must contain specs, fixtures, prompts, a CI skeleton and issue
-  text — no implementation, and no complete test suite. Under-building is deliberate:
-  the attendees' agents grow the tests and CI, so the seeds stay minimal (e.g.
-  `ci.yml` echoes "no tests yet" and exits 0, with a comment saying so).
-- **BED is 0-based half-open.** State it explicitly wherever intervals are discussed;
-  the classic off-by-one is a teaching point (and the deliberate-bug exercise).
-- **Real `bedtools` is the oracle.** Every correctness story in the workshop is a golden
-  test diffing `mytools <cmd>` against `bedtools <cmd>` on files in `data/`. Fixtures
-  must be small, deterministic, committed as plain files (no generation step at workshop
-  time), and cover bookended, nested, identical, zero-length, position-0, unsorted and
-  both-strand intervals.
-- **Language-agnostic.** Where an example must pick a language use Python, but say "or
-  your language of choice" — golden tests are meant to transfer unchanged when attendees
-  reimplement a subcommand in a language they don't know.
-- **cdotlib.org is never optional.** The gene-lookup exercise defaults to
-  `https://cdotlib.org`; a volunteer-run server is a stretch goal only, and the room must
-  never be blocked on it.
-- **Tone:** terse and practical. Attendees read everything under time pressure.
+`mytools` is a small reimplementation of a subset of bedtools: `sort`, `merge`,
+`intersect`, `subtract`, `closest`. Real `bedtools` is installed and is the oracle —
+if our output differs from it on the same input, we are wrong.
 
-## Fork-safety
+## Language — fill this in at 0:30
 
-Attendees work on forks and review each other's PRs there. Any `gh pr create` or
-`gh issue` incantation written into the workshop docs must target the attendee's own
-fork (`gh pr create --repo <their-fork>`), never this upstream template. Forks don't
-copy issues, so issue text lives in the repo (README or `issues/`) for attendees to
-have their agent re-file — that re-filing is itself the first exercise.
+**`mytools` is written in Rust.** Every subcommand and every test. Don't
+introduce a second language without asking me.
 
-## Note on this file
+One codebase, one language: several agents work on this in parallel and they will each
+pick their own otherwise. Reimplementing a single subcommand elsewhere is a deliberate
+stretch goal, not a default.
 
-`workshop-repo-notes.md` also asks for a `CLAUDE.md` at the repo root as a *teaching
-example* — an opinionated ~30-line conventions file written as if for the mytools
-project. That is a different document from this one, which guides work on the template
-itself. Put the teaching example somewhere it can't shadow this file (e.g.
-`specs/CLAUDE.md.example`, copied into place by attendees) or fold the mytools
-conventions in as a clearly-labelled section, rather than overwriting this file.
+## Interval semantics — read this before touching overlap logic
 
-## Commands
+BED is **0-based, half-open**. `chr1 100 200` covers bases 100..199. Therefore:
 
-There is no build, test or lint step yet — nothing executable is committed. Verification
-is by inspection against `workshop-repo-notes.md`, plus `gh` for issues/PRs.
+- Two intervals overlap iff `a.start < b.end AND b.start < a.end`. Note strict `<`.
+- Bookended intervals (`a.end == b.start`) do **not** overlap. They do merge under
+  `merge -d 0`.
+- Zero-length intervals (`start == end`) are legal in our fixtures and bedtools
+  handles them in ways you will not guess. Do not "fix" them — match the oracle.
 
-## Open TODOs from the brief
+Every off-by-one bug in this project lives in that comparison. When a golden test
+fails, look there first.
 
-- ~~Verify the real cdot API paths at cdotlib.org~~ — done 2026-09-08. cdotlib.org does
-  **not** serve `/gene/{symbol} -> {chrom,start,end,strand}`; that endpoint returns
-  metadata only (no coordinates) and 404s as HTML. `specs/gene-api.openapi.yaml` is
-  therefore *our own* simple protocol, with cdot as one swappable client behind it:
-  `GET /transcripts/gene/{sym}/mane/GRCh38?annotation_consortium=RefSeq` -> take the
-  first value -> `genome_builds.GRCh38` -> exon min/max for the span, plus an
-  `NC_000017.11 -> chr17` contig map. Verified against known GRCh38 coordinates.
-- ~~Set per-key spend caps on the workshop API keys.~~ — moot as of 2026-09-10: 24
-  individual subscription accounts instead, one per attendee, signed in with
-  `/login`. Remote Control needs a real subscription login — neither an API key nor
-  a `claude setup-token` token can establish one — which is why the accounts are
-  worth the handling. Open: whether those accounts log in by password or by emailed
-  code, which decides whether attendees do their own `/login` at 0:05 or organisers
-  do 24 of them the day before.
-- ~~Confirm `bedtools` is in the VM image.~~ — v2.31.1 present on the build box; still
-  worth confirming on the actual attendee image.
-- Dry-run the full agenda once.
-- `data/genes.gtf` is a real, unmodified region-subset of GENCODE v50 (provenance in its
-  header). `data/genes.bed` is derived from it: the MANE Select transcript span of each
-  gene that has one. Regenerate rather than hand-editing, and keep the round-trip in
-  `tests/README.md` passing. Cross-checked 2026-09-08: for the 19 genes in common, these
-  spans match cdotlib's RefSeq MANE spans exactly, so the GTF-backed server and the cdot
-  client agree.
-- `data/broken.vcf` was produced by a seeded generator (kept OUT of the repo on purpose
-  — it names every planted bug). `data/broken.vcf.answers.rot13` is the authoritative
-  record: 13 violations, with line numbers and what each tool does or doesn't catch.
-  Measured, not assumed: `bcftools view` and `bcftools stats` both exit 0. If you
-  regenerate the file, re-measure and update the key, since line numbers will move.
-- `data/hg002.vcf.gz` (+`.tbi`) and `data/hg002.highconf.bed` are region-subsets of
-  GIAB HG002 NISTv4.2.1 (GRCh38), unmodified otherwise. Provenance is in the VCF
-  header as `##workshop_source` / `##workshop_regions`; the regions are the four
-  neighbourhood spans of `data/genes.gtf` (`bedtools merge -d 1000000` over its gene
-  rows). Measured 2026-09-10: 2,436 records, 2,019 SNVs, 418 indels, longest REF 40 bp,
-  119 variants outside the 387 high-confidence intervals, 2 of 25 genes with zero
-  variants. Those counts appear in `issues/04`, `issues/06` and `tests/README.md` — if
-  you regenerate, re-measure and update all three. The VCF is the **negative control**
-  for the validator exercise, so it must stay valid: never plant anything in it.
-- Gene coordinates are defined as the **MANE Select span**, not the GTF `gene` row span
-  (they differ — BRCA1 by ~45 kb). This is stated in `specs/gene-api.openapi.yaml`; keep
-  it stated, or the two backends silently disagree.
+## Testing
+
+- `./tests/run_golden.sh` diffs every subcommand against real bedtools on `data/`.
+  It does not exist yet — `tests/README.md` has the worked example to build it from.
+- **Run it before every commit.** It takes seconds; there is no excuse.
+- Fixtures are `data/a.bed`, `data/b.bed` (edge cases) and `data/genes.bed`.
+  Do not regenerate or "tidy" them — the edge cases are deliberate.
+- New subcommand or flag? Add its golden case in the same commit.
+- Unit tests live in `tests/` too and must run without bedtools. One per edge case:
+  bookended, zero-length, nested, position 0, and the overlap predicate itself.
+- Fixed a failing golden test? Add the unit test that would have caught it first.
+- If bedtools does something surprising, the test encodes bedtools' behaviour.
+  Add a comment saying why; do not encode what you think it should do.
+
+## Code
+
+- Prefer streaming I/O. Read line by line, write as you go. `sort` is the one
+  command allowed to hold a chromosome in memory.
+- Read from a file argument or stdin (`-` means stdin).
+- Errors go to stderr, never stdout — stdout is data and gets piped.
+- Exit codes: `0` success, `1` bad input data, `2` usage error.
+- No third-party runtime dependencies. Standard library only.
+
+## Commits and PRs
+
+- Small commits, one logical change each, message referencing the issue: `sort: handle
+  unsorted chrom order (#3)`.
+- Branch per issue: `feat/3-sort`. Exception: trivial one-liners go straight to main —
+  ask me which I want rather than defaulting to a PR.
+- Closing an issue means checking the code does what the issue asked, not remembering
+  that you wrote it.
+- PRs go to **your own fork** — see the fork rule at the top of this file.
